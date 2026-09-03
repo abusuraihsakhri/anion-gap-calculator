@@ -1,168 +1,112 @@
 # Anion Gap Calculator
 
-> **Domain:** Clinical Decision Support & Biomedical Computing  
-> **Reference Guidelines & Standards:** `Standard Clinical Formulations & ISO/IEC Quality Frameworks`
+A pure Python clinical nephrology, critical care, and emergency medicine acid-base diagnostic engine implementing:
+- **Standard Serum Anion Gap:** $\text{AG} = [\text{Na}^+] - ([\text{Cl}^-] + [\text{HCO}_3^-])$
+- **Potassium-Adjusted Anion Gap:** $\text{AG}_{\text{K}} = ([\text{Na}^+] + [\text{K}^+]) - ([\text{Cl}^-] + [\text{HCO}_3^-])$
+- **Albumin-Corrected Anion Gap (Figge-Jabor-Kazda-Fencl Formula):**
+  $$\text{AG}_{\text{corr}} = \text{AG} + 2.5 \times (4.0 - \text{Albumin [g/dL]})$$
+  *Hypoalbuminemia markedly reduces unmeasured anions, masking high anion gap metabolic acidosis.*
+- **Delta Gap ($\Delta\text{AG}$) and Delta Ratio ($\Delta/\Delta$):**
+  $$\Delta\text{AG} = \text{AG} - 12, \quad \Delta\text{Ratio} = \frac{\Delta\text{AG}}{24 - [\text{HCO}_3^-]}$$
+  - **$< 0.4 - 0.8$:** Mixed high-AG and non-anion gap (hyperchloremic) metabolic acidosis (e.g. diarrhea, RTA).
+  - **$0.8 - 2.0$:** Pure high anion gap metabolic acidosis (e.g. DKA, lactic acidosis, toxic alcohol ingestion).
+  - **$> 2.0$:** High anion gap metabolic acidosis with concurrent metabolic alkalosis or pre-existing respiratory acidosis compensation.
+- **Serum Osmolal Gap Calculation:**
+  $$\text{Osm}_{\text{calc}} = 2 \times [\text{Na}^+] + \frac{\text{Glucose}}{18} + \frac{\text{BUN}}{2.8} + \frac{\text{EtOH}}{4.6}$$
+  $$\text{Osmolal Gap} = \text{Measured Osm} - \text{Osm}_{\text{calc}}$$
+  *Flags toxic alcohol ingestion (methanol, ethylene glycol, isopropanol) when osmolal gap $> 10 - 15\text{ mOsm/kg}$.*
+- **High-Throughput Batch CSV Processing:** Evaluates metabolic panels across emergency and ICU patient cohorts.
 
-<div align="center">
-
-[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
-![Python](https://img.shields.io/badge/Python-3.10%20%7C%203.11%20%7C%203.12-3776AB.svg?logo=python&logoColor=white)
-![FastAPI](https://img.shields.io/badge/FastAPI-0.111-009688.svg?logo=fastapi&logoColor=white)
-![Audit Trail](https://img.shields.io/badge/Audit-HMAC--SHA256_Tamper--Evident-brightgreen.svg)
-![Zero-PHI Guard](https://img.shields.io/badge/Guard-Zero--PHI_Outbound-blue.svg)
-![Docker](https://img.shields.io/badge/Docker-Ready-2496ED.svg?logo=docker&logoColor=white)
-
-</div>
-
----
-
-## 📖 What It Does
-
-Anion Gap Calculator
-
-Real clinical calculator for acid-base interpretation using:
-  - Anion Gap (AG)
-  - Albumin-Corrected Anion Gap
-  - Potassium-Adjusted Anion Gap
-  - Delta Gap and Delta Ratio
-  - Osmolal Gap
-
-All formulas based on standard clinical references.
-Python stdlib only.
-
-Author: Dr. Abu Suraih Sakhri
-License: MIT
+Requires Python standard library only (zero external runtime dependencies).
 
 ---
 
-## ⚙️ Key Capabilities & Algorithmic Modules
+## Acid-Base Differential & Mnemonic Diagnostic Tiers
 
-### 🔬 Analytical Functions
-
-- **`anion_gap()`**: Standard Anion Gap.
-
-AG = Na - (Cl + HCO3)
-
-Parameters
-----------
-na   : Sodium in mEq/L
-cl   : Chloride in mEq/L
-hco3 : Bicarbonate in mEq/L
-
-Returns
--------
-Anion gap in mEq/L (rounded to 2 decimals).
-- **`anion_gap_with_potassium()`**: Potassium-Adjusted Anion Gap.
-
-AG_k = (Na + K) - (Cl + HCO3)
-
-Some institutions include potassium in the calculation.
-- **`corrected_anion_gap()`**: Albumin-Corrected Anion Gap.
-
-AG_corrected = AG + 2.5 * (4.0 - albumin)
-
-Albumin is a major unmeasured anion. Hypoalbuminemia lowers the AG,
-potentially masking a clinically significant elevated gap.  Adding
-2.5 mEq/L for every 1 g/dL below 4.0 corrects for this effect.
-
-Parameters
-----------
-ag      : Measured anion gap (mEq/L)
-albumin : Serum albumin in g/dL
-
-Returns
--------
-Corrected anion gap in mEq/L.
-- **`delta_gap()`**: Delta Gap = AG - reference_AG (default 12).
-
-Represents the increase in unmeasured anions above normal.
-- **`delta_ratio()`**: Delta Ratio = (AG - ref_AG) / (ref_HCO3 - HCO3).
-
-Interpretation:
-  < 1.0  : Mixed high-AG + non-AG metabolic acidosis
-  1.0-2.0: Pure high-AG metabolic acidosis
-  > 2.0  : Concurrent metabolic alkalosis
-
-Parameters
-----------
-ag           : Anion gap (mEq/L)
-hco3         : Bicarbonate (mEq/L)
-reference_ag : Normal AG (default 12)
-reference_hco3: Normal HCO3 (default 24)
-
-Returns
--------
-Dict with 'delta_gap', 'delta_ratio', and 'interpretation'.
+| Clinical Classification | Criteria | Common Etiologies / Mnemonic |
+|:------------------------|:---------|:-----------------------------|
+| **High Anion Gap Metabolic Acidosis (HAGMA)** | $\text{AG} > 12\text{ mEq/L}$ | **GOLD MARK / MUDPILES:** Glycols, Oxoproline, L-lactate, D-lactate, Methanol, Aspirin, Renal failure, Ketoacidosis |
+| **Normal Anion Gap (NAGMA)** | $\text{AG} \le 12$, low $\text{HCO}_3^-$ | **HARDCARP:** Hyperalimentation, Acetazolamide, Renal tubular acidosis, Diarrhea, Ureteroenterostomy, Pancreatic fistula |
+| **Elevated Osmolal Gap** | $\text{Gap} > 10\text{ mOsm/kg}$ | Methanol, Ethylene glycol, Isopropanol, Propylene glycol, Ketoacidosis |
 
 ---
 
-## 📐 Mathematical Formulation & Logic
+## Features
 
-```text
-  All formulas based on standard clinical references.
-  Osmolal Gap = Measured Osm - Calculated Osm.
-  Calculated Osm = 2*Na + Glucose/18 + BUN/2.8 + EtOH/4.6
-  Dict with calculated_osm, osmolal_gap, and interpretation.
-  "calculated_osm": round(calc_osm, 2),
-```
+- **Albumin Correction:** Prevents missed metabolic acidosis in critically ill and septic patients with hypoalbuminemia.
+- **Triple Acid-Base Disorder Detection:** Synthesizes AG, corrected AG, and Delta Ratio to detect concurrent non-gap acidosis and metabolic alkalosis.
+- **Toxic Ingestion Screening:** Integrates measured osmolality, serum ethanol, glucose, and BUN to isolate occult alcohol ingestions.
+- **Batch CSV Processing:** High-throughput batch evaluation with detailed interpretive summaries.
 
 ---
 
-## 💻 CLI Quickstart & Usage
+## Installation & Requirements
 
-### 1. Guided Interactive Mode
+- Python 3.10+ (tested on 3.10, 3.11, 3.12)
+- Zero external runtime dependencies. `pytest` is optional for running tests.
+
 ```bash
-python cli.py
+git clone https://github.com/abusuraihsakhri/anion-gap-calculator.git
+cd anion-gap-calculator
 ```
 
-### 2. Direct Parameterized Evaluation
+---
+
+## CLI Usage
+
+### 1. Standard Anion Gap Evaluation
 ```bash
-python cli.py --na <value> --cl <value> --hco3 <value> --albumin <value>
+python cli.py calculate --na 140 --cl 100 --hco3 24 --json
 ```
 
-### Parameter Reference
-- `--na`: Specifies input measurement or parameter value.
-- `--cl`: Specifies input measurement or parameter value.
-- `--hco3`: Specifies input measurement or parameter value.
-- `--albumin`: Specifies input measurement or parameter value.
-- `--k`: Specifies input measurement or parameter value.
-- `--measured-osm`: Specifies input measurement or parameter value.
-- `--glucose`: Specifies input measurement or parameter value.
-- `--bun`: Specifies input measurement or parameter value.
-- `--input`: Specifies input measurement or parameter value.
-- `--output`: Specifies input measurement or parameter value.
+### 2. Albumin-Corrected & Delta Ratio Evaluation
+```bash
+python cli.py calculate --na 135 --cl 98 --hco3 12 --albumin 2.5 --json
+```
+
+### 3. Toxic Ingestion / Osmolal Gap Evaluation
+```bash
+python cli.py calculate --na 140 --cl 100 --hco3 15 --measured-osm 325 --glucose 110 --bun 18 --json
+```
+
+### 4. Batch CSV Processing
+```bash
+python cli.py batch --input sample.csv --output results.csv
+```
 
 ---
 
-## 🛡️ Security & Enterprise Architecture
+## Python API Quickstart
 
-* **Zero-PHI Outbound Interceptor:** Active AST and regex inspection blocking SSNs, MRNs, phone numbers, and patient identifiers.
-* **Tamper-Evident HMAC-SHA256 Audit Trail:** Chained, cryptographically signed logs for every evaluation and state transition.
-* **Air-Gapped LLM Reasoning Adapter:** Agnostic integration for local Ollama instances (`llama3`, `mistral`), Claude 3.5 Sonnet, GPT-4o, and deterministic test mocks.
-* **Active Learning Bayesian Calibration:** Dynamic tracker updating worker reliability weights and monitoring Brier calibration drift.
-* **FastAPI & Prometheus Telemetry:** Exposes OpenAPI 3.1 REST endpoints and operational Prometheus metrics (`/metrics`).
+```python
+import anion_gap
+
+# Comprehensive evaluation
+res = anion_gap.calculate(
+    na=135.0,
+    cl=98.0,
+    hco3=12.0,
+    albumin=2.5,
+    measured_osm=320.0,
+    glucose=180.0,
+    bun=28.0,
+)
+
+print(f"Measured AG: {res['anion_gap']} mEq/L")
+print(f"Albumin-Corrected AG: {res['corrected_anion_gap']} mEq/L")
+print(f"Delta Ratio: {res['delta_ratio']} ({res['delta_ratio_interpretation']})")
+if 'osmolal_gap' in res:
+    print(f"Osmolal Gap: {res['osmolal_gap']['osmolal_gap']} mOsm/kg")
+print(f"Summary: {res['summary']}")
+```
 
 ---
 
-## 🧪 Testing & Verification
+## Running Tests
 
-Run the automated test suite:
+Run the test suite using standard `unittest` or `pytest`:
 
 ```bash
 pytest -v
 ```
 
-Execute high-throughput batch simulation benchmarks:
-
-```bash
-python simulator.py --tasks 1000 --concurrency 8
-```
-
----
-
-## 🐳 Container Deployment
-
-```bash
-docker build -t anion-gap-calculator .
-docker run -p 8000:8000 anion-gap-calculator
-```
